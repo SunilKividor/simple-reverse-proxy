@@ -1,0 +1,28 @@
+INTEGER FILE DESCRIPTOR
+-
+In C, file descriptors are integer values used to represent open files or resources like sockets.
+When a client connects to a server using a socket, the operating system assigns an integer file descriptor to identify that connection.
+A file descriptor is the low-level C way of describing an open file, or a file-like object like a socket connection.
+The kernel has some kind of big array, where each item in the array describes all of the inner details about an open file-like thing,
+and the integer file descriptor is something like an index into that array.
+Standard file descriptors:
+0 → stdin (standard input)
+1 → stdout (standard output)
+2 → stderr (standard error)
+Any number ≥ 3 represents an open file or socket.
+-
+
+memset(&hints, 0, sizeof(struct addrinfo));
+-
+memset() → A standard C function that fills memory with a specific value.
+&hints → The address of the hints structure (i.e., the memory we want to clear).
+0 → The value to set in each byte (zeroing out all fields).
+sizeof(struct addrinfo) → The number of bytes to clear, which is the size of struct addrinfo.
+
+The memory allocated for hints may contain garbage values.
+If we don't initialize it, getaddrinfo() might misinterpret uninitialized fields.
+Using memset() ensures all fields start as 0, avoiding unexpected behavior.
+-
+
+
+
