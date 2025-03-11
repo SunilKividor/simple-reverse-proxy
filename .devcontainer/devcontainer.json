@@ -1,0 +1,15 @@
+{
+    "name": "Linux Dev Container",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "settings": {
+        "terminal.integrated.shell.linux": "/bin/bash"
+    },
+    "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+    ],
+    "forwardPorts": [],
+    "postCreateCommand": "echo 'Container setup complete!'"
+}
