@@ -1,14 +1,20 @@
-#include <unistd.h>
+#define _POSIX_C_SOURCE 200112L
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <netdb.h>
+#include <unistd.h>
 #include <errno.h>
 #include <stdint.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/epoll.h>
 
-#include "netutils.c"
-#include "epollinterface.c"
-#include "connection.c"
+#include "netutils.h"
+#include "epollinterface.h"
+#include "connection.h"
+#include "server_socket.h"
+#include "netutils.h"
 
 #define MAX_LISTEN_BACKLOG 4096
 
@@ -17,12 +23,76 @@ struct server_socket_event_data {
     char* backend_port_str;
 };
 
+struct proxy_data {
+    struct epoll_event_handler* client;
+    struct epoll_event_handler* backend;
+};
+
+void on_client_read(void* closure,char* buffer,int len) {
+    struct proxy_data* data = (struct proxy_data*) closure;
+    if(data->backend == NULL) {
+        return;
+    }
+    printf("client side data sending...\n");
+    connection_write(data->backend,buffer,len);
+}
+
+void on_client_close(void* closure) {
+    struct proxy_data* data = (struct proxy_data*) closure;
+    if(data->backend == NULL) {
+        return;
+    }
+    connection_close(data->backend);
+    data->client = NULL;
+    data->backend = NULL;
+    epoll_add_to_free_list(closure);
+}
+
+void on_backend_read(void* closure,char* buffer,int len) {
+    struct proxy_data* data = (struct proxy_data*) closure;
+    if(data->client == NULL) {
+        return;
+    }
+    printf("backend side data sending...\n");
+    connection_write(data->client,buffer,len);
+}
+
+void on_backend_close(void* closure) {
+    struct proxy_data* data = (struct proxy_data*) closure;
+    if(data->backend == NULL) {
+        return;
+    }
+    connection_close(data->client);
+    data->client = NULL;
+    data->backend = NULL;
+    epoll_add_to_free_list(closure);
+}
+
 void handle_client_connection(int client_socket_fd,char* backend_host,char* backend_port_str) {
     struct epoll_event_handler* client_connection;
-    printf("Creating connection object for incoming connection...");
+    printf("Creating connection object for incoming connection...\n");
     client_connection = create_connection(client_socket_fd);
 
-    
+    int backend_socket_fd = connect_to_backend(backend_host,backend_port_str);
+    struct epoll_event_handler* backend_connection;
+    printf("Creating connection object for backend connection...\n");
+    backend_connection = create_connection(backend_socket_fd);
+
+    struct proxy_data* proxy = malloc(sizeof(struct proxy_data));
+    proxy->client = client_connection;
+    proxy->backend = backend_connection;
+
+    struct connection_closure* client_closure = (struct connection_closure*) client_connection->closure;
+    client_closure->on_read = on_client_read;
+    client_closure->on_read_closure = proxy;
+    client_closure->on_close = on_client_close;
+    client_closure->on_close_closure = proxy;
+
+    struct connection_closure* backend_closure = (struct connection_closure*) backend_connection->closure;
+    backend_closure->on_read = on_backend_read;
+    backend_closure->on_read_closure = proxy;
+    backend_closure->on_close = on_backend_close;
+    backend_closure->on_close_closure = proxy;
 }
 
 void handle_server_socket_event(struct epoll_event_handler* self,uint32_t events) {
@@ -36,7 +106,7 @@ void handle_server_socket_event(struct epoll_event_handler* self,uint32_t events
             if((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
                 break;
             } else {
-                fprintf(stderr,"Could not accept");
+                fprintf(stderr,"Could not accept\n");
                 exit(1);
             }
         }
@@ -58,7 +128,7 @@ int create_and_bind(char* server_port_str) {
     getaddrinfo_error = getaddrinfo(NULL,server_port_str,&hints,&addrs);
 
     if(getaddrinfo_error != 0) {
-        fprintf(stderr,"Couldn't find the local host details: %s",gai_strerror(getaddrinfo_error));
+        fprintf(stderr,"Couldn't find the local host details: %s\n",gai_strerror(getaddrinfo_error));
         exit(1);
     }
     struct addrinfo* addrinfo_iter;
@@ -83,7 +153,7 @@ int create_and_bind(char* server_port_str) {
     }
 
     if(addrinfo_iter == NULL){
-        fprintf(stderr,"Couldn't bind");
+        fprintf(stderr,"Couldn't bind\n");
         exit(1);
     }
 

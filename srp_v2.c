@@ -8,8 +8,8 @@
 #include <netdb.h>
 #include <unistd.h>
 
-#include "epollinterface.c"
-#include "server_socket.c"
+#include "epollinterface.h"
+#include "server_socket.h"
 
 #define MAX_LISTEN_BACKLOG 1
 #define BUFFER_SIZE 4096
@@ -27,10 +27,10 @@ int main(int argc,char *argv[]) {
 
     epoll_init();
 
-    struct epoll_event_handler* server_socket_event_handler;
-    server_socket_event_handler = create_server_socket_handler(server_port_str,backend_addr,backend_port_str);
+    create_server_socket_handler(server_port_str,backend_addr,backend_port_str);
 
-
+    printf("Listening on port %s\n",server_port_str);
+    epoll_do_reactor_loop();
 
     return 0;
 }

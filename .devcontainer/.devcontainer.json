@@ -1,0 +1,21 @@
+{
+    "name": "Linux Dev Container",
+    "image": "ubuntu:latest",
+    "features": {
+      "ghcr.io/devcontainers/features/common-utils:1": {},
+      "ghcr.io/devcontainers/features/gcc:1": {}
+    },
+    "customizations": {
+      "vscode": {
+        "settings": {
+          "terminal.integrated.defaultProfile.linux": "bash"
+        },
+        "extensions": [
+          "ms-vscode.cpptools",
+          "twxs.cmake"
+        ]
+      }
+    },
+    "postCreateCommand": "apt update && apt install -y build-essential net-tools vim"
+  }
+  
